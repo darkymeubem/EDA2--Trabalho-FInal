@@ -12,5 +12,3 @@ Desenvolver um sistema de análise textual focado no **Mercado Financeiro**, uti
 * Felipe Lopes Pedroza
 * Gustavo Oki de Freitas Rodrigues Leite
 
----
-*Em constante atualização.*
