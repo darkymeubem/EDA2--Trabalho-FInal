@@ -9,6 +9,6 @@ Desenvolver um sistema de análise textual focado no **Mercado Financeiro**, uti
 * Caio Vilas Boas Miranda (232001380)
 * Carlos Henrique de Paiva Munis (221022480)
 * Davi Rodrigues Nunes (232014413)
-* Felipe Lopes Pedroza 
+* Felipe Lopes Pedroza (231026330)
 * Gustavo Oki de Freitas Rodrigues Leite (231034716)
 
