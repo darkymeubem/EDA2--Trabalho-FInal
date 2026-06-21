@@ -1,0 +1,18 @@
+# Compilados
+*.o
+*.exe
+*.out
+tests/test_*
+!tests/test_*.c
+fingraph
+
+# Dados e saídas geradas em runtime
+data/*.csv
+output/
+
+# Pastas do Claude / superpowers
+docs/superpowers/
+
+# Windows
+Thumbs.db
+desktop.ini
