@@ -43,8 +43,10 @@ int csv_parse_linha(const char *linha, LinhaCSV *saida) {
         campo++;
         pos = 0;
         i++;
-        if (campo >= MAX_CAMPOS)
-          break;
+        if (campo >= MAX_CAMPOS) {
+          saida->n_campos = campo;
+          return saida->n_campos;
+        }
       } else if (c == '\0') {
         break;
       } else {

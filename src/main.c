@@ -74,7 +74,6 @@ typedef struct {
 
 static EntradaVocab vocab[MAX_VOCAB];
 static int          n_vocab = 0;
-static int          vocab_ordenado = 0;  /* flag: 1 após ordenar */
 
 /* Busca linear — usada durante a construção (vocab ainda cresce) */
 static int vocab_buscar_linear(const char *termo) {
@@ -108,27 +107,6 @@ static void vocab_ordenar(void) {
             vocab[idx_min]   = tmp;
         }
     }
-    vocab_ordenado = 1;
-}
-
-/* Busca binária — usar somente após vocab_ordenar() */
-static int vocab_buscar_binario(const char *termo) {
-    int lo = 0, hi = n_vocab - 1;
-    while (lo <= hi) {
-        int mid = (lo + hi) / 2;
-        int cmp = strcmp(termo, vocab[mid].termo);
-        if (cmp == 0) return mid;
-        if (cmp < 0)  hi = mid - 1;
-        else          lo = mid + 1;
-    }
-    return -1;
-}
-
-/* Wrapper: usa busca binária se ordenado, linear caso contrário */
-static int vocab_buscar(const char *termo) {
-    return vocab_ordenado
-           ? vocab_buscar_binario(termo)
-           : vocab_buscar_linear(termo);
 }
 
 /* ─────────────────────────────────────────────
@@ -169,7 +147,7 @@ static void construir_vocab(Documento *docs, int n_docs) {
     for (int d = 0; d < n_docs; d++) {
         /* Flag de aparição por documento (sem hash: array de flags) */
         int visto[MAX_VOCAB];
-        memset(visto, 0, sizeof(int) * (n_vocab < MAX_VOCAB ? n_vocab + 1 : MAX_VOCAB));
+        memset(visto, 0, sizeof(visto));
 
         for (int t = 0; t < docs[d].n_tokens; t++) {
             int idx = vocab_inserir(docs[d].tokens[t]);
@@ -643,24 +621,24 @@ int main(int argc, char *argv[]) {
     int origem_bfs = ordem[0];
     printf("  Origem: \"%s\" (grau %d)\n\n", termos[origem_bfs], g->grau[origem_bfs]);
 
-    /* BFS com fila manual (array como fila FIFO) */
-    int *dist     = malloc(n_termos * sizeof(int));
-    int *fila_bfs = malloc(n_termos * sizeof(int));
+    /* BFS usando o módulo de fila (fila_criar/enfileirar/desenfileirar) */
+    int  *dist = malloc(n_termos * sizeof(int));
     for (int i = 0; i < n_termos; i++) dist[i] = -1;
 
-    int frente = 0, tras = 0;
-    dist[origem_bfs]    = 0;
-    fila_bfs[tras++]    = origem_bfs;
+    Fila *fila_bfs = fila_criar(n_termos);
+    dist[origem_bfs] = 0;
+    fila_enfileirar(fila_bfs, origem_bfs);
 
-    while (frente < tras) {
-        int u = fila_bfs[frente++];
+    while (!fila_vazia(fila_bfs)) {
+        int u = fila_desenfileirar(fila_bfs);
         for (ArestaNo *a = g->adj[u]; a; a = a->prox) {
             if (dist[a->vizinho] == -1) {
                 dist[a->vizinho] = dist[u] + 1;
-                fila_bfs[tras++] = a->vizinho;
+                fila_enfileirar(fila_bfs, a->vizinho);
             }
         }
     }
+    fila_liberar(fila_bfs);
 
     int max_dist = 0;
     for (int i = 0; i < n_termos; i++)
@@ -678,7 +656,7 @@ int main(int argc, char *argv[]) {
         }
         printf("\n");
     }
-    free(dist); free(fila_bfs);
+    free(dist);
 
     /* ═══════════════════════════════════════════
      * [03] SCC — Kosaraju
@@ -771,6 +749,7 @@ int main(int argc, char *argv[]) {
         if (idx < 0) {
             if (n_periodos >= MAX_PERIODOS) continue;
             strncpy(periodos[n_periodos].periodo, p, MAX_PERIODO_LEN - 1);
+            periodos[n_periodos].periodo[MAX_PERIODO_LEN - 1] = '\0';
             periodos[n_periodos].n_docs = 0;
             idx = n_periodos++;
         }
