@@ -92,6 +92,10 @@ void lista_cliques_liberar(ListaCliques *lc) {
   free(lc);
 }
 
+/* Variante de Tomita: escolhe um pivô u em P∪X que maximiza |P ∩ N(u)| e
+ * itera apenas sobre P \ N(u). Não altera o conjunto de cliques maximais —
+ * apenas poda ramos redundantes da recursão, evitando o custo exponencial em
+ * grafos densos. */
 static void bron_kerbosch_rec(const Grafo *g, int *r, int n_r, int *p, int n_p,
                               int *x, int n_x, ListaCliques *lc) {
   if (n_p == 0 && n_x == 0) {
@@ -100,29 +104,53 @@ static void bron_kerbosch_rec(const Grafo *g, int *r, int n_r, int *p, int n_p,
   }
 
   int n_vert = g->n_vert;
-  int n_inicial = n_p;
 
-  for (int iter = 0; iter < n_inicial; iter++) {
-    int v = p[0];
+  /* Seleção do pivô: dentre P∪X, o que tem mais vizinhos em P. */
+  int pivo = -1;
+  int melhor_cont = -1;
+  for (int origem = 0; origem < 2; origem++) {
+    int *base = origem == 0 ? p : x;
+    int n_base = origem == 0 ? n_p : n_x;
+    for (int i = 0; i < n_base; i++) {
+      int u = base[i];
+      int cont = 0;
+      for (int j = 0; j < n_p; j++)
+        if (grafo_tem_aresta(g, u, p[j]))
+          cont++;
+      if (cont > melhor_cont) {
+        melhor_cont = cont;
+        pivo = u;
+      }
+    }
+  }
+
+  /* Candidatos a expandir: P \ N(pivo) (snapshot, pois P muda no laço). */
+  int *cand = malloc(n_p * sizeof(int));
+  if (n_p > 0 && !cand) {
+    perror("malloc");
+    exit(1);
+  }
+  int n_cand = 0;
+  for (int j = 0; j < n_p; j++)
+    if (!grafo_tem_aresta(g, pivo, p[j]))
+      cand[n_cand++] = p[j];
+
+  for (int c = 0; c < n_cand; c++) {
+    int v = cand[c];
 
     int *novo_r = malloc((n_r + 1) * sizeof(int));
-    if (!novo_r) {
+    int *novo_p = malloc(n_vert * sizeof(int));
+    int *novo_x = malloc(n_vert * sizeof(int));
+    if (!novo_r || !novo_p || !novo_x) {
       perror("malloc");
       exit(1);
     }
     memcpy(novo_r, r, n_r * sizeof(int));
     novo_r[n_r] = v;
 
-    int *novo_p = malloc(n_vert * sizeof(int));
-    int *novo_x = malloc(n_vert * sizeof(int));
-    if (!novo_p || !novo_x) {
-      perror("malloc");
-      exit(1);
-    }
-
     int n_novo_p = 0;
-    for (int j = 1; j < n_p; j++)
-      if (grafo_tem_aresta(g, v, p[j]))
+    for (int j = 0; j < n_p; j++)
+      if (p[j] != v && grafo_tem_aresta(g, v, p[j]))
         novo_p[n_novo_p++] = p[j];
 
     int n_novo_x = 0;
@@ -137,10 +165,17 @@ static void bron_kerbosch_rec(const Grafo *g, int *r, int n_r, int *p, int n_p,
     free(novo_p);
     free(novo_x);
 
-    memmove(p, p + 1, (n_p - 1) * sizeof(int));
-    n_p--;
+    /* Move v de P para X. */
+    for (int j = 0; j < n_p; j++)
+      if (p[j] == v) {
+        memmove(p + j, p + j + 1, (n_p - j - 1) * sizeof(int));
+        n_p--;
+        break;
+      }
     x[n_x++] = v;
   }
+
+  free(cand);
 }
 
 ListaCliques *bron_kerbosch(const Grafo *g) {
