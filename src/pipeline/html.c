@@ -152,14 +152,14 @@ int exportar_html(const char *caminho, const Grafo *g,
     }
     fputs("]);\n", f);
 
-    /* ── Arestas (grafo PONDERADO: peso PPMI vira largura + rótulo) ── */
+    /* ── Arestas (grafo PONDERADO: largura = PPMI, valor no tooltip) ── */
     fputs("const edges = new vis.DataSet([\n", f);
     for (int u = 0; u < g->n_vert; u++)
         for (ArestaNo *a = g->adj[u]; a; a = a->prox)
             if (a->vizinho > u)
-                fprintf(f, "{from:%d,to:%d,value:%.4f,label:\"%.2f\","
+                fprintf(f, "{from:%d,to:%d,value:%.4f,"
                            "title:\"PPMI %.4f\"},\n",
-                        u, a->vizinho, a->peso, a->peso, a->peso);
+                        u, a->vizinho, a->peso, a->peso);
     fputs("]);\n", f);
 
     /* ── Maior clique (ids + termos) para o botão ── */
@@ -177,17 +177,20 @@ int exportar_html(const char *caminho, const Grafo *g,
     fputs(
         "const container = document.getElementById('grafo');\n"
         "const network = new vis.Network(container, {nodes, edges}, {\n"
-        "  nodes:{shape:'dot',scaling:{min:6,max:48,label:{min:10,max:26}},"
-        "font:{color:'#e6e6e6',strokeWidth:0}},\n"
-        "  edges:{scaling:{min:1,max:8},color:{color:'#5a6472',opacity:0.5},"
-        "smooth:false,font:{size:9,color:'#8b94a3',strokeWidth:0,align:'top'}},\n"
-        "  physics:{solver:'forceAtlas2Based',stabilization:{iterations:250},"
-        "forceAtlas2Based:{gravitationalConstant:-45,springLength:90}},\n"
-        /* esconder arestas durante zoom/arraste deixa a navegação fluida */
+        /* labels de nó só aparecem quando o nó for grande o suficiente (zoom in) */
+        "  nodes:{shape:'dot',scaling:{min:6,max:36,"
+        "label:{enabled:true,min:11,max:20,drawThreshold:8,maxVisible:30}},"
+        "font:{color:'#e6e6e6',strokeWidth:2,strokeColor:'#0e1116'}},\n"
+        /* sem label nas arestas: era o maior gargalo de rendering (361 textos/frame) */
+        "  edges:{scaling:{min:1,max:6},color:{color:'#5a6472',opacity:0.45},"
+        "smooth:false},\n"
+        "  physics:{solver:'forceAtlas2Based',"
+        "stabilization:{iterations:150,fit:true},"
+        "forceAtlas2Based:{gravitationalConstant:-50,springLength:80,"
+        "damping:0.6}},\n"
         "  interaction:{hover:true,tooltipDelay:80,"
-        "hideEdgesOnDrag:true,hideEdgesOnZoom:true}\n"
+        "hideEdgesOnDrag:true,hideEdgesOnZoom:true,zoomSpeed:0.5}\n"
         "});\n"
-        /* desliga a física assim que estabiliza: zoom e arraste ficam leves */
         "network.once('stabilizationIterationsDone', () =>"
         " network.setOptions({physics:false}));\n"
         "document.getElementById('busca').addEventListener('input', e => {\n"
