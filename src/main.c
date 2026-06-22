@@ -1,7 +1,7 @@
 /*
  * main.c — GraphFinance
  * Análise textual de notícias financeiras via Grafos de Coocorrência
- * UnB 2024
+ * UnB 2026
  *
  * Pipeline:
  *   1. Leitura do CSV
@@ -11,7 +11,7 @@
  *   5. TF-IDF para seleção dos termos mais relevantes
  *   6. Construção do grafo com peso PPMI
  *   7. Aplicação do limiar de conectividade
- *   8. Algoritmos: Grau, BFS, SCC (Kosaraju), MST (Prim), Cliques (Bron-Kerbosch)
+ *   8. Algoritmos: Grau, BFS, Componentes Conexas, MST (Prim), Cliques (Bron-Kerbosch)
  *   9. Análise temporal por período
  */
 
@@ -33,12 +33,12 @@
 /* ─────────────────────────────────────────────
  * Constantes de configuração
  * ───────────────────────────────────────────── */
-#define MAX_DOCS        5000    /* 1 documento = 1 manchete (granularidade original) */
+#define MAX_DOCS        60000   /* 1 documento = 1 manchete (granularidade original) */
 #define MAX_TOKENS_DOC  256
-#define MAX_VOCAB       8000
+#define MAX_VOCAB       60000
 #define MAX_TOKEN_LEN   64
 #define TOP_N_TERMOS    600     /* teto de termos selecionados (válvula de segurança; filtro de DF já faz o corte principal) */
-#define LIMIAR_PADRAO   0.5     /* limiar PPMI para manter aresta            */
+#define LIMIAR_PADRAO   2.0     /* limiar PPMI para manter aresta            */
 #define TOP_GRAU        15      /* top-N vértices por grau a exibir          */
 #define MAX_PERIODO_LEN 8       /* "YYYY-MM\0"                               */
 #define MAX_PERIODOS    24
@@ -148,10 +148,13 @@ static void callback_csv(const LinhaCSV *linha, void *ctx) {
  * ───────────────────────────────────────────── */
 
 static void construir_vocab(Documento *docs, int n_docs) {
+    /* Flag de aparição por documento (sem hash: array de flags).
+     * Alocado no heap — MAX_VOCAB é grande demais para a pilha. */
+    char *visto = malloc(MAX_VOCAB);
+    if (!visto) { perror("malloc"); exit(1); }
+
     for (int d = 0; d < n_docs; d++) {
-        /* Flag de aparição por documento (sem hash: array de flags) */
-        int visto[MAX_VOCAB];
-        memset(visto, 0, sizeof(visto));
+        memset(visto, 0, MAX_VOCAB);
 
         for (int t = 0; t < docs[d].n_tokens; t++) {
             int idx = vocab_inserir(docs[d].tokens[t]);
@@ -162,6 +165,7 @@ static void construir_vocab(Documento *docs, int n_docs) {
             }
         }
     }
+    free(visto);
     /* Após construir todo o vocab, ordena para habilitar busca binária */
     vocab_ordenar();
 }
@@ -206,10 +210,11 @@ static double calcular_tfidf(const Documento *doc, int vocab_idx, int n_docs) {
  */
 static int selecionar_termos(Documento *docs, int n_docs,
                               char selecionados[][MAX_TOKEN_LEN], int top_n) {
-    int aceito[MAX_VOCAB];
+    int *aceito = malloc(MAX_VOCAB * sizeof(int));
+    TermoScore *scores = malloc(MAX_VOCAB * sizeof(TermoScore));
+    if (!aceito || !scores) { perror("malloc"); exit(1); }
     filtrar_df(n_docs, aceito);
 
-    TermoScore scores[MAX_VOCAB];
     int        n_scores = 0;
 
     for (int i = 0; i < n_vocab; i++) {
@@ -238,6 +243,9 @@ static int selecionar_termos(Documento *docs, int n_docs,
         strncpy(selecionados[i], scores[i].termo, MAX_TOKEN_LEN - 1);
         selecionados[i][MAX_TOKEN_LEN - 1] = '\0';
     }
+
+    free(aceito);
+    free(scores);
     return n;
 }
 
@@ -279,17 +287,19 @@ static void ordenar_termos(char termos[][MAX_TOKEN_LEN], int n) {
  *
  * PPMI(u,v) = max(0, log( P(u,v) / (P(u) * P(v)) ))
  *
- * onde:
- *   P(u,v) = cooc(u,v) / total_pares
+ * cooc(u,v) e freq_doc(u) são ambos contados POR DOCUMENTO, então as três
+ * probabilidades vivem no mesmo espaço amostral (documentos) e usam n_docs
+ * como denominador comum:
+ *   P(u,v) = cooc(u,v)  / n_docs
  *   P(u)   = freq_doc(u) / n_docs
  *   P(v)   = freq_doc(v) / n_docs
  * ───────────────────────────────────────────── */
 
 static double calcular_ppmi(double cooc_uv, double freq_u, double freq_v,
-                             double total_pares, double n_docs) {
+                             double n_docs) {
     if (cooc_uv <= 0.0 || freq_u <= 0.0 || freq_v <= 0.0) return 0.0;
 
-    double p_uv = cooc_uv / total_pares;
+    double p_uv = cooc_uv / n_docs;
     double p_u  = freq_u  / n_docs;
     double p_v  = freq_v  / n_docs;
 
@@ -355,7 +365,7 @@ static Grafo *construir_grafo_ppmi(
                 double c = cooc[(size_t)i * n_termos + j];
                 if (c <= 0.0) continue;
                 double ppmi = calcular_ppmi(c, freq[i], freq[j],
-                                            total_pares, (double)n_docs);
+                                            (double)n_docs);
                 if (ppmi > 0.0)
                     grafo_adicionar_aresta(g, i, j, ppmi);
             }
@@ -461,10 +471,12 @@ int main(int argc, char *argv[]) {
     printf("[2/6] Vocabulário (busca bin.): %d termos únicos\n", n_vocab);
 
     /* Contar quantos passam no filtro de DF */
-    int aceito_df[MAX_VOCAB];
+    int *aceito_df = malloc(MAX_VOCAB * sizeof(int));
+    if (!aceito_df) { perror("malloc"); exit(1); }
     filtrar_df(n_docs, aceito_df);
     int n_aceitos = 0;
     for (int i = 0; i < n_vocab; i++) n_aceitos += aceito_df[i];
+    free(aceito_df);
     printf("[3/6] Após filtro de DF       : %d termos (min=%.0f%%, max=%.0f%%)\n",
            n_aceitos, DF_MIN_FRAC * 100, DF_MAX_FRAC * 100);
 
@@ -670,7 +682,8 @@ int main(int argc, char *argv[]) {
      * ═══════════════════════════════════════════ */
     titulo_secao(6, "ANALISE TEMPORAL (por mes)");
 
-    Periodo periodos[MAX_PERIODOS];
+    Periodo *periodos = malloc(MAX_PERIODOS * sizeof(Periodo));
+    if (!periodos) { perror("malloc"); exit(1); }
     int     n_periodos = 0;
 
     for (int d = 0; d < n_docs; d++) {
@@ -747,11 +760,12 @@ int main(int argc, char *argv[]) {
     printf("  Limiar PPMI aplicado     : %.2f\n", limiar);
     printf("  Períodos detectados      : %d\n\n", n_periodos);
     separador('#', 60);
-    printf("  GraphFinance · UnB 2024\n");
+    printf("  GraphFinance · UnB 2026\n");
     separador('#', 60);
     printf("\n");
 
     grafo_liberar(g);
+    free(periodos);
     free(docs);
     return 0;
 }
