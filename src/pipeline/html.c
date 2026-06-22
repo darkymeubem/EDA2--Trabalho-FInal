@@ -36,6 +36,20 @@ int exportar_html(const char *caminho, const Grafo *g,
     int n_nos = 0;
     for (int v = 0; v < n_termos; v++) if (g->grau[v] > 0) n_nos++;
 
+    /* Maior clique (Bron-Kerbosch) — destacável por um botão na página. */
+    ListaCliques *lc = bron_kerbosch(g);
+    int *clq = NULL, clq_n = 0;
+    if (lc) {
+        int melhor = -1;
+        for (int i = 0; i < lc->n_cliques; i++)
+            if (lc->itens[i].n > clq_n) { clq_n = lc->itens[i].n; melhor = i; }
+        if (melhor >= 0) {
+            clq = malloc(clq_n * sizeof(int));
+            for (int i = 0; i < clq_n; i++) clq[i] = lc->itens[melhor].vertices[i];
+        }
+        lista_cliques_liberar(lc);
+    }
+
     /* ── Cabeçalho HTML + estilo ── */
     fputs("<!DOCTYPE html>\n<html lang=\"pt-br\">\n<head>\n", f);
     fputs("<meta charset=\"utf-8\">\n", f);
@@ -67,6 +81,11 @@ int exportar_html(const char *caminho, const Grafo *g,
         "espessura/rótulo da aresta = peso PPMI</span>\n"
         "  <input id=\"busca\" placeholder=\"buscar termo…\">\n",
         n_nos, g->n_arest, n_comps);
+
+    fputs("  <button id=\"btnClique\" style=\"margin:4px 0;width:100%;padding:7px;"
+          "border:0;border-radius:5px;background:#36c98a;color:#06120a;"
+          "font-weight:600;cursor:pointer\">★ Destacar maior clique</button>\n"
+          "  <div id=\"statusClique\" style=\"font-size:12px;color:#9aa\"></div>\n", f);
 
     /* Painel de grupos (gerado aqui pois precisa de 'termos'). */
     {
@@ -143,7 +162,18 @@ int exportar_html(const char *caminho, const Grafo *g,
                         u, a->vizinho, a->peso, a->peso, a->peso);
     fputs("]);\n", f);
 
-    /* ── Configuração da rede + busca ── */
+    /* ── Maior clique (ids + termos) para o botão ── */
+    fputs("const maxClique = [", f);
+    for (int i = 0; i < clq_n; i++) { if (i) fputc(',', f); fprintf(f, "%d", clq[i]); }
+    fputs("];\n", f);
+    fputs("const maxCliqueTermos = [", f);
+    for (int i = 0; i < clq_n; i++) {
+        if (i) fputc(',', f);
+        fputc('"', f); escrever_js(f, termos[clq[i]]); fputc('"', f);
+    }
+    fputs("];\n", f);
+
+    /* ── Configuração da rede + interações ── */
     fputs(
         "const container = document.getElementById('grafo');\n"
         "const network = new vis.Network(container, {nodes, edges}, {\n"
@@ -151,10 +181,15 @@ int exportar_html(const char *caminho, const Grafo *g,
         "font:{color:'#e6e6e6',strokeWidth:0}},\n"
         "  edges:{scaling:{min:1,max:8},color:{color:'#5a6472',opacity:0.5},"
         "smooth:false,font:{size:9,color:'#8b94a3',strokeWidth:0,align:'top'}},\n"
-        "  physics:{solver:'forceAtlas2Based',stabilization:{iterations:300},"
+        "  physics:{solver:'forceAtlas2Based',stabilization:{iterations:250},"
         "forceAtlas2Based:{gravitationalConstant:-45,springLength:90}},\n"
-        "  interaction:{hover:true,tooltipDelay:80}\n"
+        /* esconder arestas durante zoom/arraste deixa a navegação fluida */
+        "  interaction:{hover:true,tooltipDelay:80,"
+        "hideEdgesOnDrag:true,hideEdgesOnZoom:true}\n"
         "});\n"
+        /* desliga a física assim que estabiliza: zoom e arraste ficam leves */
+        "network.once('stabilizationIterationsDone', () =>"
+        " network.setOptions({physics:false}));\n"
         "document.getElementById('busca').addEventListener('input', e => {\n"
         "  const q = e.target.value.trim().toLowerCase();\n"
         "  if(!q) return;\n"
@@ -162,8 +197,16 @@ int exportar_html(const char *caminho, const Grafo *g,
         "  if(hit){ network.focus(hit.id,{scale:1.2,animation:true});"
         " network.selectNodes([hit.id]); }\n"
         "});\n"
+        "document.getElementById('btnClique').addEventListener('click', () => {\n"
+        "  if(!maxClique.length) return;\n"
+        "  network.selectNodes(maxClique);\n"
+        "  network.fit({nodes:maxClique,animation:true});\n"
+        "  document.getElementById('statusClique').textContent ="
+        " 'Maior clique ('+maxClique.length+'): '+maxCliqueTermos.join(', ');\n"
+        "});\n"
         "</script>\n</body>\n</html>\n", f);
 
+    free(clq);
     free(componente);
     fclose(f);
     return n_nos;
