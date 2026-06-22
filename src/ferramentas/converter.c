@@ -3,7 +3,7 @@
  * schema esperado pelo pipeline: "data,titulo,resumo" (data em ISO YYYY-MM-DD).
  *
  * Uso:
- *   ./converter > dados/noticias.csv
+ *   ./converter > dados/finais/noticias.csv
  *
  * Lê os arquivos de fonte conhecidos em dados/, normaliza a data e descarta
  * linhas sem data reconhecível ou sem título. Reutiliza o parser de csv.c e o
@@ -65,11 +65,11 @@ int main(void) {
     /* Mapeamento de colunas por fonte (índices após csv_parse_linha). */
     Fonte fontes[] = {
         /* reuters:  Headlines, Time, Description */
-        {"dados/reuters_headlines.csv",  1, 0, 2},
+        {"dados/brutos/reuters_headlines.csv",  1, 0, 2},
         /* cnbc:     Headlines, Time, Description */
-        {"dados/cnbc_headlines.csv",     1, 0, 2},
+        {"dados/brutos/cnbc_headlines.csv",     1, 0, 2},
         /* guardian: Time, Headlines (sem resumo)  */
-        {"dados/guardian_headlines.csv", 0, 1, -1},
+        {"dados/brutos/guardian_headlines.csv", 0, 1, -1},
     };
     int n_fontes = (int)(sizeof(fontes) / sizeof(fontes[0]));
 

@@ -1,4 +1,4 @@
-#include "./../src/csv.h"
+#include "csv.h"
 #include "testutil.h"
 #include <stdio.h>
 #include <string.h>

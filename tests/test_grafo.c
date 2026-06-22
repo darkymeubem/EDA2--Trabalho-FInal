@@ -1,4 +1,4 @@
-#include "./../src/grafo.h"
+#include "grafo.h"
 #include "testutil.h"
 
 int main(void) {

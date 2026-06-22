@@ -1,4 +1,4 @@
-#include "./../src/fila.h"
+#include "fila.h"
 #include "testutil.h"
 
 int main(void) {

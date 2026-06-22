@@ -1,5 +1,5 @@
-#include "./../src/algoritmos_grafo.h"
-#include "./../src/grafo.h"
+#include "algoritmos_grafo.h"
+#include "grafo.h"
 #include "testutil.h"
 
 /* --- bfs --- */

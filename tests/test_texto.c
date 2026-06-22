@@ -1,4 +1,4 @@
-#include "./../src/texto.h"
+#include "texto.h"
 #include "testutil.h"
 #include <string.h>
 
