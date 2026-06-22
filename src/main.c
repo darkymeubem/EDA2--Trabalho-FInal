@@ -31,6 +31,8 @@
 #include "pipeline/vocabulario.h"
 #include "pipeline/coocorrencia.h"
 #include "pipeline/relatorio.h"
+#include "pipeline/gexf.h"
+#include "pipeline/html.h"
 
 /* ─────────────────────────────────────────────
  * Leitura do CSV via callback
@@ -82,10 +84,25 @@ int main(int argc, char *argv[]) {
     const char *caminho_csv = "dados/finais/noticias.csv";
     double      limiar      = LIMIAR_PADRAO;
     int         top_n       = TOP_N_TERMOS;
+    const char *gexf_path   = NULL;
+    const char *html_path   = NULL;
 
-    if (argc >= 2) caminho_csv = argv[1];
-    if (argc >= 3) limiar      = atof(argv[2]);
-    if (argc >= 4) top_n       = atoi(argv[3]);
+    /* Argumentos posicionais [csv] [limiar] [top_n], mais flags opcionais
+     * "--gexf <arquivo>" (Gephi) e "--html <arquivo>" (navegador). */
+    const char *pos[3];
+    int n_pos = 0;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--gexf") == 0 && i + 1 < argc) {
+            gexf_path = argv[++i];
+        } else if (strcmp(argv[i], "--html") == 0 && i + 1 < argc) {
+            html_path = argv[++i];
+        } else if (n_pos < 3) {
+            pos[n_pos++] = argv[i];
+        }
+    }
+    if (n_pos >= 1) caminho_csv = pos[0];
+    if (n_pos >= 2) limiar      = atof(pos[1]);
+    if (n_pos >= 3) top_n       = atoi(pos[2]);
 
     printf("\n");
     linha_de('#', 60);
@@ -138,7 +155,25 @@ int main(int argc, char *argv[]) {
            limiar, g->n_arest);
     grafo_liberar(g_completo);
 
-    /* ── 4. Relatório ── */
+    /* ── 4. Exportações opcionais da visualização ── */
+    if (gexf_path) {
+        int n_nos = exportar_gexf(gexf_path, g, termos, n_termos);
+        if (n_nos >= 0)
+            printf("[GEXF] Grafo exportado para %s (%d nós, %d arestas)\n",
+                   gexf_path, n_nos, g->n_arest);
+        else
+            fprintf(stderr, "Aviso: falha ao exportar GEXF para %s\n", gexf_path);
+    }
+    if (html_path) {
+        int n_nos = exportar_html(html_path, g, termos, n_termos);
+        if (n_nos >= 0)
+            printf("[HTML] Grafo exportado para %s (%d nós, %d arestas) "
+                   "— abra no navegador\n", html_path, n_nos, g->n_arest);
+        else
+            fprintf(stderr, "Aviso: falha ao exportar HTML para %s\n", html_path);
+    }
+
+    /* ── 5. Relatório ── */
     relatorio_gerar(g, termos, n_termos, docs, n_docs, limiar,
                     n_vocab, n_aceitos);
 

@@ -90,7 +90,12 @@ static const char *STOPWORDS[] = {
     "too",     "under",  "until",   "up",         "very",     "was",
     "we",      "were",   "what",    "when",       "where",    "which",
     "while",   "who",    "whom",    "why",        "will",     "with",
-    "would",   "you",    "your",    "yours",      "yourself", "yourselves"};
+    "would",   "you",    "your",    "yours",      "yourself", "yourselves",
+    /* Ruído de domínio: nomes de programa/segmento (CNBC "Mad Money /
+     * Lightning Round" do Jim Cramer) e boilerplate corporativo — não são
+     * temas econômicos, apenas formatos recorrentes de manchete. */
+    "cramer",  "lightning", "mad",   "jim",        "host",     "remix",
+    "callers", "round",     "chief", "officer"};
 
 int eh_stopword(const char *palavra) {
   int n = sizeof(STOPWORDS) / sizeof(STOPWORDS[0]);

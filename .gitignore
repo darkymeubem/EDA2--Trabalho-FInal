@@ -9,6 +9,8 @@ fingraph
 # Dados e saídas geradas em runtime
 data/*.csv
 output/
+*.gexf
+grafo*.html
 
 # Pastas do Claude / superpowers
 docs/superpowers/
