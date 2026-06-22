@@ -32,18 +32,25 @@ Argumentos posicionais (todos opcionais):
 
 ## 🌐 Visualização (HTML interativo)
 
-A flag `--html` gera uma página **autocontida** que abre em qualquer navegador — sem
-instalar nada:
+A flag `--html` faz o programa rodar todos os algoritmos no corpus e **gerar** uma página
+HTML autocontida com os resultados embutidos — sem instalar nada para abrir:
 
 ```bash
-./fingraph dados/convertidos/cnbc_convertido.csv 2.0 --html grafo.html
+./fingraph dados/convertidos/cnbc_convertido.csv 2.0 600 --html grafo.html
 ```
+
+O que acontece ao rodar esse comando:
+1. O programa lê o CSV, calcula PPMI, executa BFS (componentes) e Bron-Kerbosch (clique máximo) em C;
+2. Os resultados (nós, arestas ponderadas, grupos, clique máximo) são escritos como dados reais dentro do `grafo.html`;
+3. Abra o arquivo gerado no navegador — os dados já estão lá, não há servidor nem conexão necessária.
+
+> O HTML é um **snapshot** do momento da execução. Para atualizar os dados (ex.: outro limiar ou corpus), basta rodar o comando novamente.
 
 Abra o `grafo.html`. Você verá:
 - **cor do nó** = grupo/tema (componente conexa);
 - **tamanho do nó** = relevância do termo (grau);
-- **espessura e rótulo da aresta** = peso PPMI (grafo ponderado);
-- **painel lateral** com os grupos/temas nomeados e busca de termos;
+- **espessura da aresta** = peso PPMI (grafo ponderado); passe o mouse para ver o valor;
+- **painel lateral** com os grupos/temas nomeados, busca de termos e botão de clique máximo;
 - layout de força que separa os temas automaticamente (arrasta, zoom, hover).
 
 > A página usa a biblioteca `vis-network` via CDN (precisa de internet na 1ª abertura).
